@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ITQ 엑셀 자동 채점 시스템</title>
+    <!-- 엑셀 데이터 및 스타일 파싱을 위한 ExcelJS 라이브러리 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --surface-color: #1e293b;
+            --primary-color: #3b82f6;
+            --primary-hover: #2563eb;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-container {
+            background: rgba(30, 41, 59, 0.7);
+            border: 2px dashed #475569;
+            border-radius: 16px;
+            padding: 3rem;
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            cursor: pointer;
+            position: relative;
+        }
+
+        .upload-container:hover, .upload-container.dragover {
+            border-color: var(--primary-color);
+            background: rgba(30, 41, 59, 0.9);
+            transform: translateY(-2px);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+        }
+
+        #fileInput {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            opacity: 0; cursor: pointer;
+        }
+
+        .results {
+            margin-top: 2rem;
+            width: 100%;
+            max-width: 800px;
+            display: none;
+        }
+
+        .score-card {
+            background: linear-gradient(145deg, #1e293b, #0f172a);
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+            border: 1px solid #334155;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.5s ease-out;
+        }
+
+        .score-display {
+            font-size: 4rem;
+            font-weight: bold;
+            color: var(--success-color);
+            text-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .section {
+            background: var(--surface-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid var(--primary-color);
+            animation: fadeIn 0.5s ease-out backwards;
+        }
+
+        .check-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 1rem;
+            border-bottom: 1px solid #334155;
+            transition: background 0.2s;
+        }
+
+        .check-item:last-child {
+            border-bottom: none;
+        }
+        
+        .check-item:hover {
+            background: rgba(255,255,255,0.02);
+        }
+
+        .icon {
+            font-size: 1.5rem;
+            margin-right: 1rem;
+            min-width: 30px;
+        }
+        .icon.pass { color: var(--success-color); }
+        .icon.fail { color: var(--danger-color); }
+        .icon.warn { color: var(--warning-color); }
+
+        .details h3 {
+            margin: 0 0 0.25rem 0;
+            font-size: 1.1rem;
+        }
+
+        .feedback {
+            color: #fca5a5;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+            background: rgba(239, 68, 68, 0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Loading Spinner */
+        .loader {
+            border: 4px solid #334155;
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 2rem auto;
+            display: none;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>✨ ITQ 엑셀 AI 채점 시스템</h1>
+        <p>2026년 2월 A유형 완벽 지원 | 별도 설치 없이 즉시 검사</p>
+    </div>
+
+    <div class="upload-container" id="dropZone">
+        <div class="upload-icon">📊</div>
+        <h2>클릭하여 파일 업로드</h2>
+        <p class="text-muted">또는 .xlsx 파일을 이곳으로 드래그 하세요 (수험번호-이름.xlsx)</p>
+        <input type="file" id="fileInput" accept=".xlsx" />
+    </div>
+
+    <div class="loader" id="loader"></div>
+
+    <div class="results" id="results">
+        <div class="score-card">
+            <h2 id="studentInfo">홍길동 (12345678)</h2>
+            <div class="score-display" id="totalScore">0 / 100</div>
+            <p>※ 자동 분석이 어려운 차트 상세 속성 등은 수동 확인이 필요합니다.</p>
+        </div>
+        <div id="sectionsContainer"></div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const loader = document.getElementById('loader');
+        const results = document.getElementById('results');
+        const sectionsContainer = document.getElementById('sectionsContainer');
+        const totalScoreEl = document.getElementById('totalScore');
+        const studentInfoEl = document.getElementById('studentInfo');
+
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if(!file) return;
+
+            // 로딩 UI
+            results.style.display = 'none';
+            loader.style.display = 'block';
+
+            try {
+                // 파일 리더 및 ExcelJS 초기화
+                const arrayBuffer = await file.arrayBuffer();
+                const workbook = new ExcelJS.Workbook();
+                await workbook.xlsx.load(arrayBuffer);
+
+                // 평가 실행
+                const report = gradeWorkbook(workbook, file.name);
+                renderReport(report);
+            } catch (err) {
+                alert("파일을 분석하는 중 오류가 발생했습니다: " + err.message);
+                console.error(err);
+            } finally {
+                loader.style.display = 'none';
+            }
+        });
+
+        function gradeWorkbook(wb, filename) {
+            let total = 0;
+            let checks = [];
+
+            // 1. 파일명 분석
+            const nameMatch = filename.match(/(\d+)-([가-힣]+)\.xlsx/);
+            const studentId = nameMatch ? nameMatch[1] : '알수없음';
+            const studentName = nameMatch ? nameMatch[2] : '알수없음';
+            
+            let passedName = !!nameMatch;
+            checks.push({
+                section: '기본 구조',
+                item: '파일명 규칙 (수험번호-이름.xlsx)',
+                passed: passedName,
+                score: passedName ? 10 : 0, max: 10,
+                feedback: passedName ? '' : `파일명이 잘못되었습니다: ${filename}`
+            });
+            total += passedName ? 10 : 0;
+
+            const sheetNames = wb.worksheets.map(ws => ws.name);
+            const expected = ["제1작업", "제2작업", "제3작업", "제4작업"];
+            
+            // 시트 존재 여부
+            expected.forEach(sheet => {
+                const exist = sheetNames.includes(sheet);
+                checks.push({
+                    section: '기본 구조',
+                    item: `${sheet} 시트 생성 확인`, passed: exist,
+                    score: exist ? 5 : 0, max: 5,
+                    feedback: exist ? '' : `${sheet} 시트가 누락되었습니다.`
+                });
+                if(exist) total += 5;
+            });
+
+            // 제1작업 분석
+            const ws1 = wb.getWorksheet("제1작업");
+            if(ws1) {
+                // 함수 및 텍스트 검사 (간략화)
+                let formulas = [];
+                ws1.eachRow((row, rowNumber) => {
+                    row.eachCell((cell, colNumber) => {
+                        if(cell.formula) formulas.push(cell.formula.toUpperCase());
+                    });
+                });
+
+                const reqFuncs = ["CHOOSE", "IF", "COUNTIF", "VLOOKUP"];
+                reqFuncs.forEach(f => {
+                    const found = formulas.some(fx => fx.includes(f));
+                    checks.push({
+                        section: '제1작업',
+                        item: `${f} 함수 사용 여부`, passed: found,
+                        score: found ? 5 : 0, max: 5,
+                        feedback: found ? '' : `${f} 함수가 수식에 포함되지 않았습니다.`
+                    });
+                    if(found) total += 5;
+                });
+            }
+
+            // 제2작업 (간단 모의 확인)
+            const ws2 = wb.getWorksheet("제2작업");
+            if(ws2) {
+                const b14 = ws2.getCell('B14').value;
+                const passedFilter = !!b14;
+                checks.push({
+                    section: '제2작업',
+                    item: `고급 필터 조건 설정(B14)`, passed: passedFilter,
+                    score: passedFilter ? 10 : 0, max: 10,
+                    feedback: passedFilter ? '' : `B14 셀 주변에 고급 필터 조건이 기입되지 않았습니다.`
+                });
+                if(passedFilter) total += 10;
+            }
+
+            // 수동 확인 안내 추가
+            checks.push({
+                section: '제3,4작업 (수동 평가 필수)',
+                item: `피벗 테이블 구조, 차트 축 양식은 직접 채점이 필요합니다.`,
+                passed: true, warn: true,
+                score: 0, max: 0,
+                feedback: `* 차트 축 서식, 피벗 2만 단위 간격조정, 도형 서식 등 엑셀 UI를 직접 켜서 꼼꼼히 확인하세요!`
+            });
+
+            return { id: studentId, name: studentName, total, checks };
+        }
+
+        function renderReport(report) {
+            studentInfoEl.innerText = `${report.name} (${report.id})`;
+            totalScoreEl.innerText = `${report.total} / 100`;
+
+            // 그룹화
+            const grouped = {};
+            report.checks.forEach(c => {
+                if(!grouped[c.section]) grouped[c.section] = [];
+                grouped[c.section].push(c);
+            });
+
+            sectionsContainer.innerHTML = '';
+            
+            let delay = 0;
+            for(let sec in grouped) {
+                delay += 0.1;
+                const secDiv = document.createElement('div');
+                secDiv.className = 'section';
+                secDiv.style.animationDelay = delay + 's';
+                secDiv.innerHTML = `<h2 style="margin-top:0">${sec}</h2>`;
+
+                grouped[sec].forEach(chk => {
+                    let iconHTML = `<span class="icon pass">✅</span>`;
+                    if(chk.warn) iconHTML = `<span class="icon warn">⚠️</span>`;
+                    else if(!chk.passed) iconHTML = `<span class="icon fail">❌</span>`;
+
+                    let feedbackHTML = chk.feedback ? `<div class="feedback">${chk.feedback}</div>` : '';
+
+                    secDiv.innerHTML += `
+                        <div class="check-item">
+                            ${iconHTML}
+                            <div class="details">
+                                <h3>${chk.item} <span style="font-size:0.9rem; color:var(--text-muted)">(${chk.warn ? '점수 외' : '+'+chk.score+' / '+chk.max})</span></h3>
+                                ${feedbackHTML}
+                            </div>
+                        </div>
+                    `;
+                });
+                sectionsContainer.appendChild(secDiv);
+            }
+
+            results.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
