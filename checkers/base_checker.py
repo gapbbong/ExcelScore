@@ -58,15 +58,13 @@ def check_base_structure(file_path: str, wb) -> List[CheckResult]:
             ws = wb[sheet_name]
             col_a = ws.column_dimensions['A']
             width = col_a.width if col_a else None
-            # 열 너비가 1 언저리로 설정되었는지 확인
-            # openpyxl에서 1 이면 대략 1.x 언저리로 표시되기도 함
             is_valid_width = width is not None and width < 2.0
             results.append(
                 CheckResult(
-                    item_name=f"{sheet_name} A열 너비",
+                    item_name=f"{sheet_name} A열 너비 (1)",
                     passed=is_valid_width,
-                    score_earned=5 if is_valid_width else 0,
-                    max_score=5,
+                    score_earned=2 if is_valid_width else 0,
+                    max_score=2,
                     feedback="" if is_valid_width else f"[열너비 감점] {sheet_name}의 A열 너비가 1이 아닙니다."
                 )
             )

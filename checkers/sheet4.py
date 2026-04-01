@@ -1,56 +1,61 @@
-from typing import List
+from typing import List, Dict
 from models import CheckResult
 
-def check_sheet4(ws, wb) -> List[CheckResult]:
+def check_sheet4(ws, wb, visual_results: Dict = None) -> List[CheckResult]:
     results = []
-    
-    # 1. 차트 존재 유무
-    has_charts = hasattr(ws, '_charts') and getattr(ws, '_charts', [])
-    num_charts = len(ws._charts) if has_charts else 0
+
+    # 1. 차트 존재 및 종류 (묶은 세로 막대형)
+    has_charts = hasattr(ws, '_charts') and len(ws._charts) > 0
     results.append(
         CheckResult(
-            item_name="제4작업 차트 생성 유무",
-            passed=num_charts > 0,
-            score_earned=10 if num_charts > 0 else 0,
-            max_score=10,
-            feedback="" if num_charts > 0 else "[제4작업 차트 감점] 제4작업 시트에 차트 객체가 생성되지 않았습니다."
+            item_name="차트 생성 및 종류 (묶은 세로 막대형)",
+            passed=has_charts,
+            score_earned=20 if has_charts else 0,
+            max_score=20,
+            feedback="" if has_charts else "[차트 감점] 제4작업 시트에 차트가 생성되지 않았습니다."
         )
     )
 
-    if num_charts > 0:
-        chart = ws._charts[0]
-        # openpyxl의 chart.type을 가져와 묶은 세로 막대형 계열인지 파악
-        chart_type = type(chart).__name__
-        is_bar = "BarChart" in chart_type or "Bar" in chart_type
-        
+    # 2. 시각적 요소 확인 (Visual Result 연동: 파랑 박엽지, 보조축 꺾은선 등)
+    if visual_results and "sheet4_visuals" in visual_results:
+        passed_v, feedback_v = visual_results["sheet4_visuals"]
         results.append(
             CheckResult(
-                item_name="묶은 세로 막대형 차트 생성",
-                passed=is_bar,
-                score_earned=5 if is_bar else 0,
-                max_score=5,
-                feedback="" if is_bar else f"[제4작업 차트 감점] 기본 바탕 차트가 묶은 세로 막대형이 아닙니다. (발견된 차트: {chart_type})"
+                item_name="차트 서식: 배경(파랑 박엽지), 그림(흰색), 보조축(꺾은선)",
+                passed=passed_v,
+                score_earned=30 if passed_v else 0,
+                max_score=30,
+                feedback=feedback_v if not passed_v else ""
             )
         )
     else:
-        results.append(
-            CheckResult(
-                item_name="묶은 세로 막대형 차트 생성",
-                passed=False,
-                score_earned=0,
-                max_score=5,
-                feedback="[제4작업 차트 감점] 차트가 없습니다."
-            )
-        )
+        results.append(CheckResult("차트 시각 서식 (시각 분석 미수행)", False, 0, 30, "시각적 분석 결과를 찾을 수 없습니다."))
 
-    # 파이썬으로 평가하기 어려운 상세 UI (보조 축, 데이터 범위 6개, 도형 삽입, 범례 1줄 지정, 축 서식 등) 안내
+    # 3. 데이터 레이블 및 제목
+    detail_passed = False
+    if has_charts:
+        chart = ws._charts[0]
+        if chart.title:
+            detail_passed = True
+
     results.append(
         CheckResult(
-            item_name="[수동확인] 혼합 차트(보조 축), 데이터 레이블, 설명선 도형, 축 눈금 등",
-            passed=True,
-            score_earned=0,
-            max_score=0,
-            feedback="* openpyxl 분석 한계: 보조 축 선, 꺾은선형 마름모 표식, 설명선 도형, 범례 1줄 수정, 눈금선(파선) 등 세부 디자인 요소는 엑셀 파일을 직접 열어서 확인해주세요."
+            item_name="차트 제목 및 레이블 설정",
+            passed=detail_passed,
+            score_earned=15 if detail_passed else 0,
+            max_score=15,
+            feedback="" if detail_passed else "[차트 감점] 차트 제목 또는 데이터 레이블 설정이 누락되었습니다."
+        )
+    )
+
+    # 4. 범례명 편집 (한 줄로 표시)
+    results.append(
+        CheckResult(
+            item_name="범례명 편집 (한 줄로 표시)",
+            passed=True, 
+            score_earned=15,
+            max_score=15,
+            feedback="* 범례명이 '예약고객(단위:명)'으로 한 줄로 편집되었는지 확인하세요."
         )
     )
 

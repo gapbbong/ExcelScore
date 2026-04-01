@@ -8,6 +8,8 @@ from checkers.sheet1 import check_sheet1
 from checkers.sheet2 import check_sheet2
 from checkers.sheet3 import check_sheet3
 from checkers.sheet4 import check_sheet4
+from screenshot_helper import capture_excel_screenshots
+from visual_checker import run_visual_checks
 
 def grade_excel_file(file_path: str) -> GradingReport:
     filename = os.path.basename(file_path)
@@ -23,6 +25,15 @@ def grade_excel_file(file_path: str) -> GradingReport:
 
     sections: List[SectionResult] = []
 
+    # 2. 자동 스크린샷 캡처 (OpenCV 용)
+    print(f"[{filename}] 시각 분석용 스크린샷 캡처 중...")
+    screenshot_dir = os.path.join("tmp", "screenshots", student_id)
+    screenshot_paths = capture_excel_screenshots(file_path, screenshot_dir)
+    
+    # 3. OpenCV 시각 분석 수행
+    print(f"[{filename}] OpenCV 이미지 분석 수행 중...")
+    visual_results = run_visual_checks(screenshot_paths)
+
     try:
         # data_only=False 설정으로 수식 열람
         wb = openpyxl.load_workbook(file_path, data_only=False)
@@ -30,12 +41,12 @@ def grade_excel_file(file_path: str) -> GradingReport:
         print(f"Failed to load Excel file: {e}")
         return GradingReport(student_id, student_name, sections)
     
-    # 공통 구조 검사 수행
+    # 공통 구조 검사
     sections.append(SectionResult("기본 검사 (파일명/시트)", check_base_structure(file_path, wb)))
     
     # 제1작업
     if "제1작업" in wb.sheetnames:
-        sections.append(SectionResult("제1작업", check_sheet1(wb["제1작업"], wb)))
+        sections.append(SectionResult("제1작업", check_sheet1(wb["제1작업"], wb, visual_results)))
     else:
         sections.append(SectionResult("제1작업", [CheckResult("제1작업 시트 존재 여부", False, 0, 10, "제1작업 시트가 없습니다.")]))
 
@@ -53,7 +64,7 @@ def grade_excel_file(file_path: str) -> GradingReport:
         
     # 제4작업
     if "제4작업" in wb.sheetnames:
-        sections.append(SectionResult("제4작업", check_sheet4(wb["제4작업"], wb)))
+        sections.append(SectionResult("제4작업", check_sheet4(wb["제4작업"], wb, visual_results)))
     else:
         sections.append(SectionResult("제4작업", [CheckResult("제4작업 시트 존재 여부", False, 0, 10, "제4작업 시트가 없습니다.")]))
 
